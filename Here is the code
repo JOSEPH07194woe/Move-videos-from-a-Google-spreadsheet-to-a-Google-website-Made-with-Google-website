@@ -1,0 +1,66 @@
+// This is the script that will check the Google Sheet for new video links and update the website
+
+// Replace with your Google Sheet ID (found in the sheet URL)
+var sheetId = 'YOUR_GOOGLE_SHEET_ID';  // Example: https://docs.google.com/spreadsheets/d/your-sheet-id-here/edit
+
+// Replace with the URL of your Google Site
+var siteUrl = 'YOUR_GOOGLE_SITE_URL';  // Example: https://sites.google.com/view/your-site-name
+
+// The range of cells where the video links are stored (e.g., in column A)
+var videoColumn = 1;  // Assuming the video links are in column A
+
+// The Google Sites page where you want to display the videos
+var pageUrl = '/watch-peoples-videos';  // Change to your specific page path
+
+function updateVideoLinks() {
+  // Access the Google Spreadsheet
+  var sheet = SpreadsheetApp.openById(sheetId);
+  var data = sheet.getSheetByName("user uploads");  // Update with the name of the sheet if necessary
+  var videoLinks = data.getRange(2, videoColumn, data.getLastRow() - 1, 1).getValues();
+  
+  // Get the last checked time from the script properties
+  var scriptProperties = PropertiesService.getScriptProperties();
+  var lastChecked = scriptProperties.getProperty('lastChecked');
+  
+  if (!lastChecked) {
+    // If no timestamp exists, set the current time as the initial check time
+    scriptProperties.setProperty('lastChecked', new Date().toISOString());
+    lastChecked = new Date().toISOString();
+  }
+
+  // Convert lastChecked to a Date object for comparison
+  var lastCheckedDate = new Date(lastChecked);
+  
+  // Find new video links that were added after the last checked time
+  var newLinks = [];
+  
+  for (var i = 0; i < videoLinks.length; i++) {
+    var timestamp = new Date(videoLinks[i][0]);  // Assuming the timestamp is stored with the video link
+    if (timestamp > lastCheckedDate) {
+      newLinks.push(videoLinks[i][0]);
+    }
+  }
+  
+  // If new links are found, update the Google Site
+  if (newLinks.length > 0) {
+    var page = SitesApp.getPageByUrl(siteUrl + pageUrl);
+    var content = '<ul>';
+    for (var i = 0; i < newLinks.length; i++) {
+      content += '<li><a href="' + newLinks[i] + '" target="_blank">' + newLinks[i] + '</a></li>';
+    }
+    content += '</ul>';
+    
+    page.setHtmlContent(content);
+    
+    // Update the lastChecked timestamp to the current time after updating
+    scriptProperties.setProperty('lastChecked', new Date().toISOString());
+  }
+}
+
+function createTimeDrivenTriggers() {
+  // Trigger the updateVideoLinks function every minute
+  ScriptApp.newTrigger('updateVideoLinks')
+           .timeBased()
+           .everyMinutes(1)
+           .create();
+}
